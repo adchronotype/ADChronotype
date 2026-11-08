@@ -141,7 +141,8 @@ function renderChrome() {
   bindAnswerButtons($("side"));
 }
 
-function logout() {
+async function logout() {
+  if (Q.items.length) { app().innerHTML = `<section class="card center"><p class="muted">Saving your answers…</p></section>`; await flushQueue(); }
   store.del("adc_code");
   S.code = null; S.profile = null; S.answers = {}; S.pending = null;
   route();
@@ -149,10 +150,40 @@ function logout() {
 
 // ---------- Saving ----------
 async function save(payload) {
+  await flushQueue();   // anything still sending goes first, so the Sheet stays in order
   const res = await API.call({ action: "save", code: S.code, ...payload });
   if (res.ok && res.profile) S.profile = res.profile;
   return res;
 }
+
+// Questionnaire answers are saved in the background so the page moves on straight away.
+// The queue is also kept in this browser, so nothing is lost if the page closes mid-send.
+const QKEY = () => `adc_queue_${S.code}`;
+const Q = { items: [], running: false };
+function loadQueue() { try { Q.items = JSON.parse(store.get(QKEY()) || "[]"); } catch { Q.items = []; } }
+function keepQueue() { store.set(QKEY(), JSON.stringify(Q.items)); }
+function setSaving(on, retrying) {
+  const el = $("saving");
+  el.classList.toggle("hidden", !on);
+  el.textContent = retrying ? "Saving… (connection problem, still trying)" : "Saving…";
+  el.classList.toggle("warn", !!retrying);
+}
+function queueSave(payload) { Q.items.push(payload); keepQueue(); pump(); }
+async function pump() {
+  if (Q.running) return;
+  Q.running = true;
+  while (Q.items.length) {
+    setSaving(true, false);
+    const r = await API.call({ action: "save", code: S.code, ...Q.items[0] });
+    if (r.ok || (r.error && r.error !== "network")) { Q.items.shift(); keepQueue(); }
+    else { setSaving(true, true); await new Promise((res) => setTimeout(res, 4000)); }
+  }
+  Q.running = false;
+  setSaving(false);
+}
+async function flushQueue() { pump(); while (Q.items.length || Q.running) await new Promise((r) => setTimeout(r, 150)); }
+const sameAnswers = (x, y) => Object.keys({ ...x, ...y }).filter((k) => !/_answer$|_unit_entered$/.test(k))
+  .every((k) => { const p = String(x[k] ?? ""), q = String(y[k] ?? ""); return p === q || (p !== "" && q !== "" && !isNaN(p) && !isNaN(q) && Number(p) === Number(q)); });
 
 // ---------- Where is this person up to? ----------
 function status() {
@@ -315,6 +346,7 @@ function screenLogin(msg) {
     if (!r.ok) return screenLogin(r.error === "network" ? NET_ERR : r.error === "busy" ? "Too many tries. Please wait a few minutes and try again." : "That code didn't match. Please check it, or use \"Forgot your code?\".");
     S.code = code; S.profile = r.profile;
     store.set("adc_code", code);
+    loadQueue(); if (Q.items.length) { await flushQueue(); const r2 = await API.call({ action: "login", code }); if (r2.ok) S.profile = r2.profile; }
     route();
   };
   $("go").onclick = go;
@@ -448,11 +480,17 @@ function screenSection(section, mode = "new") {
   form.addEventListener("change", syncShowIf);
   const ageBox = form.querySelector('[data-id="age"]');
   if (ageBox) { ageBox.min = CONFIG.MIN_AGE; ageBox.max = CONFIG.MAX_AGE; }
-  if (mode === "edit") $("cancel").onclick = screenMyAnswers;
+  if (mode === "edit") $("cancel").onclick = () => (S.editReturn === "answers" ? screenMyAnswers() : route());
   let warned = false;
   $("next").onclick = async () => {
     const a = collect(form);
     $("msg").innerHTML = "";
+    // Went back or pressed Edit but changed nothing: just move on
+    const prev = S.profile.sections[section.key];
+    if (editing && prev && sameAnswers(Object.fromEntries(Object.keys(a).map((k) => [k, prev.answers[k]])), a)) {
+      if (mode === "edit" && S.editReturn === "answers") return screenMyAnswers();
+      delete S.drafts[section.key]; return route();
+    }
     form.querySelectorAll(".invalid").forEach((e) => e.classList.remove("invalid"));
     form.querySelectorAll(".field-err").forEach((e) => (e.textContent = ""));
     const bad = [];
@@ -487,14 +525,14 @@ function screenSection(section, mode = "new") {
     const questions = {};
     section.items.forEach((it) => { if (it.id) questions[it.id] = it.q; });
     questions.height_cm = "Height (cm)"; questions.weight_kg = "Weight (kg)";
-    $("next").disabled = true;
-    const r = await save({ kind: "section", section: section.key, answers: { ...a, ...extra }, edit: editing, questions: editing ? questions : undefined });
-    if (!r.ok) {
-      $("next").disabled = false;
-      $("msg").innerHTML = errorBox(r.error === "locked" ? "Answers can no longer be changed once week 1 is finished." : "We couldn't save your answers. Check your internet and try again.");
-      return;
+    const answers = { ...a, ...extra };
+    const before = S.profile.sections[section.key];
+    // Only send something if this is new, or if an answer actually changed
+    if (!before || !sameAnswers(before.answers, answers)) {
+      queueSave({ kind: "section", section: section.key, answers, edit: editing, questions: editing ? questions : undefined });
+      S.profile.sections[section.key] = { saved_at: before ? before.saved_at : new Date().toISOString(), answers };
     }
-    if (mode === "edit") screenMyAnswers("Your changes are saved.");
+    if (mode === "edit" && S.editReturn === "answers") screenMyAnswers("Your changes are saved.");
     else { delete S.drafts[section.key]; route(); }
   };
 }
@@ -538,7 +576,7 @@ function answersHTML(compact) {
   return `<div class="answers ${compact ? "compact" : ""}"><h2>My answers</h2>${note}${parts}</div>`;
 }
 function bindAnswerButtons(root) {
-  root.querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => { renderChromeFor("edit"); screenSection(QUESTIONNAIRE.find((s) => s.key === b.dataset.edit), true); window.scrollTo(0, 0); });
+  root.querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => { S.editReturn = root.id === "side" ? "route" : "answers"; renderChromeFor("edit"); screenSection(QUESTIONNAIRE.find((s) => s.key === b.dataset.edit), true); window.scrollTo(0, 0); });
   root.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => screenViewAll(b.dataset.view));
 }
 function renderChromeFor(view) { S.view = view; renderChrome(); }
@@ -607,9 +645,8 @@ function screenWeeklySleep(week) {
     const a = collect($("sf"));
     delete a.week_normal_answer;
     if (!a.week_sleep_time || !a.week_wake_time || !a.week_normal) { $("msg").innerHTML = errorBox("Please answer all three questions."); return; }
-    $("next").disabled = true;
-    const r = await save({ kind: "weeksleep", week, answers: a });
-    if (!r.ok) { $("next").disabled = false; $("msg").innerHTML = errorBox("We couldn't save. Check your internet and try again."); return; }
+    queueSave({ kind: "weeksleep", week, answers: a });
+    S.profile.weeks[week].sleep = { saved_at: new Date().toISOString(), answers: a };
     route();
   };
 }
@@ -688,14 +725,14 @@ function screenAllDone() {
 // ---------- Start ----------
 $("foot-contact").innerHTML = CONTACT();
 window.addEventListener("beforeunload", (e) => {
-  if (document.querySelector(".test-card.running")) { e.preventDefault(); e.returnValue = ""; }
+  if (document.querySelector(".test-card.running") || Q.items.length) { e.preventDefault(); e.returnValue = ""; }
 });
 (async () => {
   const saved = store.get("adc_code");
   if (saved) {
     app().innerHTML = `<section class="card center"><p class="muted">Loading…</p></section>`;
     const r = await API.call({ action: "login", code: saved });
-    if (r.ok) { S.code = saved; S.profile = r.profile; }
+    if (r.ok) { S.code = saved; S.profile = r.profile; loadQueue(); if (Q.items.length) { await flushQueue(); const r2 = await API.call({ action: "login", code: saved }); if (r2.ok) S.profile = r2.profile; } }
     else if (r.error !== "network") store.del("adc_code");
   }
   route();

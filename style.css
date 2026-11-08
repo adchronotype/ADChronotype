@@ -162,3 +162,5 @@ body:not(.has-side) #hdr-answers { display: inline-block; }
 }
 .field-err { color: var(--danger); font-size: 15px; font-weight: 600; margin-top: 6px; }
 .field-err:empty { display: none; }
+.saving { font-size: 13px; color: var(--muted); }
+.saving.warn { color: var(--danger); font-weight: 600; }
