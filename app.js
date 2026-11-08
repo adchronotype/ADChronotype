@@ -553,7 +553,7 @@ function answerText(it, ans) {
   return it.unit ? `${v} ${it.unit}` : String(v);
 }
 function qaList(items, ans) {
-  return `<dl class="qa">${items.filter((it) => it.id || it.type).map((it) => {
+  return `<dl class="qa">${items.filter((it) => (it.id || it.type) && (!it.showIf || Object.entries(it.showIf).every(([k, v]) => String(ans[k] ?? "") === v))).map((it) => {
     const t = answerText(it, ans);
     return `<div><dt>${it.q}</dt><dd>${t ? esc(t) : `<span class="muted">Skipped</span>`}</dd></div>`;
   }).join("")}</dl>`;
@@ -575,9 +575,10 @@ function answersHTML(compact) {
     : `<p class="muted small">Week 1 is finished, so these answers are now locked.</p>`;
   return `<div class="answers ${compact ? "compact" : ""}"><h2>My answers</h2>${note}${parts}</div>`;
 }
-function bindAnswerButtons(root) {
-  root.querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => { S.editReturn = root.id === "side" ? "route" : "answers"; renderChromeFor("edit"); screenSection(QUESTIONNAIRE.find((s) => s.key === b.dataset.edit), true); window.scrollTo(0, 0); });
-  root.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => screenViewAll(b.dataset.view));
+function bindAnswerButtons(root, ret) {
+  const back = ret || (root.id === "side" ? "route" : "answers");
+  root.querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => { S.editReturn = back; renderChromeFor("edit"); screenSection(QUESTIONNAIRE.find((s) => s.key === b.dataset.edit), true); window.scrollTo(0, 0); });
+  root.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => screenViewAll(b.dataset.view, root.id === "side" ? "route" : "answers"));
 }
 function renderChromeFor(view) { S.view = view; renderChrome(); }
 
@@ -592,20 +593,21 @@ function screenMyAnswers(msg) {
   bindAnswerButtons(app());
   $("back").onclick = route;
 }
-function screenViewAll(key) {
+// ret: "route" = go back to where they were (opened from the side panel), "answers" = back to My answers
+function screenViewAll(key, ret = "answers") {
   window.scrollTo(0, 0);
   renderChromeFor("answers");
   const s = QUESTIONNAIRE.find((x) => x.key === key);
   const ans = S.profile.sections[key].answers;
   let html = "", group = [];
   const flush = () => { if (group.length) html += qaList(group, ans); group = []; };
-  s.items.forEach((it) => { if (it.heading) { flush(); html += `<h3 class="qa-heading">${it.heading}</h3>`; } else group.push(it); });
+  s.items.filter((it) => !it.showIf || Object.entries(it.showIf).every(([k, v]) => String(ans[k] ?? "") === v)).forEach((it) => { if (it.heading) { flush(); html += `<h3 class="qa-heading">${it.heading}</h3>`; } else group.push(it); });
   flush();
   app().innerHTML = `<section class="card">
     <p class="step">My answers</p><h1>${s.title}</h1>${html}
-    <div class="row-btns"><button class="link" id="back">Back to my answers</button>${editable() ? `<button class="btn primary" data-edit="${key}">Edit these answers</button>` : ""}</div></section>`;
-  bindAnswerButtons(app());
-  $("back").onclick = () => screenMyAnswers();
+    <div class="row-btns"><button class="btn" id="back">${ret === "route" ? "Back" : "Back to my answers"}</button>${editable() ? `<button class="btn primary" data-edit="${key}">Edit these answers</button>` : ""}</div></section>`;
+  bindAnswerButtons(app(), ret);
+  $("back").onclick = () => (ret === "route" ? route() : screenMyAnswers());
 }
 
 // ---------- Weekly sessions ----------
@@ -711,6 +713,11 @@ function runTest(week, key) {
   };
   if (key === "memory") Tests.memory(WORDSETS[week - 1], finish);
   else Tests[key](finish);
+  const begin = $("begin");
+  if (begin) {
+    begin.insertAdjacentHTML("afterend", `<button class="btn" id="test-back" style="margin-left:10px">Back</button>`);
+    $("test-back").onclick = route;
+  }
 }
 
 function screenAllDone() {

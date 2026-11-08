@@ -134,12 +134,12 @@ input.invalid { border-color: var(--danger); outline: 3px solid #fbe0dd; }
 .layout { flex: 1; display: flex; justify-content: center; align-items: flex-start; gap: 24px; width: 100%; max-width: 1180px; margin: 0 auto; }
 .layout .wrap { margin: 0; }
 .side { width: 360px; flex: none; margin-top: 24px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
-#hdr-answers { display: none; }
-@media (max-width: 1100px) {
+/* Computers: answers live in the side panel. Phones and narrow windows: a "My answers" button in the header. */
+#hdr-answers { display: none !important; }
+@media (max-width: 999px) {
   .side { display: none !important; }
-  #hdr-answers { display: inline-block; }
+  #hdr-answers { display: inline-block !important; }
 }
-body:not(.has-side) #hdr-answers { display: inline-block; }
 
 /* Answers */
 .answers h2 { margin-top: 0; }
