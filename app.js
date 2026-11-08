@@ -343,7 +343,15 @@ function screenForgot(msg) {
 }
 
 // ---------- Questionnaire ----------
+// Any item (or heading) with showIf only appears when the earlier answer matches
 function fieldHTML(it) {
+  const html = fieldInner(it);
+  if (!it.showIf) return html;
+  const [k, val] = Object.entries(it.showIf)[0];
+  const shown = String(S.answers[k] ?? "") === val;
+  return `<div class="cond ${shown ? "" : "hidden"}" data-showif="${k}" data-showval="${esc(val)}">${html}</div>`;
+}
+function fieldInner(it) {
   if (it.heading) return `<div class="q-heading"><div class="q-heading-text">${it.heading}</div>${it.note ? `<div class="q-note">${it.note}</div>` : ""}</div>`;
   const v = S.answers[it.id] ?? "";
   const label = `<div class="q">${it.q}</div>`;
@@ -358,6 +366,11 @@ function fieldHTML(it) {
       return `<div class="item">${label}<select data-id="${it.id}"><option value="">Select…</option>${it.options.map((o) => `<option ${String(o.value) === String(v) ? "selected" : ""} value="${esc(o.value)}">${o.label}</option>`).join("")}</select></div>`;
     case "radio":
       return `<div class="item">${label}<div class="radios">${it.options.map((o) => `<label class="radio"><input type="radio" name="${it.id}" data-id="${it.id}" value="${esc(o.value)}" data-label="${esc(o.label)}" ${v !== "" && String(o.value) === String(v) ? "checked" : ""}/><span>${o.label}</span></label>`).join("")}</div></div>`;
+    case "duration": {
+      // Hours and minutes; saved as total minutes
+      const h = v === "" ? "" : Math.floor(Number(v) / 60), m = v === "" ? "" : Number(v) % 60;
+      return `<div class="item">${label}<div class="inline"><input type="number" data-dur="${it.id}" data-part="h" min="0" max="16" inputmode="numeric" value="${h}" /><span class="unit">hours</span><input type="number" data-dur="${it.id}" data-part="m" min="0" max="59" inputmode="numeric" value="${m}" /><span class="unit">minutes</span></div><div class="field-err"></div></div>`;
+    }
     case "height":
       return `<div class="item">${label}<div class="inline"><select data-unit="height"><option value="cm">cm</option><option value="ftin">feet and inches</option></select>
         <span class="h-cm"><input type="number" data-id="height_cm" min="100" max="230" inputmode="decimal" placeholder="cm" value="${esc(S.answers.height_cm ?? "")}" /></span>
@@ -376,6 +389,11 @@ function collect(container) {
     if (el.type === "radio") { if (el.checked) { a[id] = el.value; a[id + "_answer"] = el.dataset.label; } else if (!(id in a)) a[id] = ""; }
     else a[id] = el.value.trim();
   });
+  container.querySelectorAll('[data-dur][data-part="h"]').forEach((hEl) => {
+    const id = hEl.dataset.dur;
+    const mEl = container.querySelector(`[data-dur="${id}"][data-part="m"]`);
+    a[id] = hEl.value === "" && mEl.value === "" ? "" : String(Number(hEl.value || 0) * 60 + Number(mEl.value || 0));
+  });
   const hu = container.querySelector('[data-unit="height"]');
   if (hu) {
     let cm = "";
@@ -392,25 +410,45 @@ function collect(container) {
   return a;
 }
 
-function screenSection(section, editing = false) {
+// mode: "new" (first time), "back" (went back to an earlier part), or "edit" (from My answers)
+function screenSection(section, mode = "new") {
+  if (mode === true) mode = "edit";
+  const editing = mode !== "new";
   const idx = QUESTIONNAIRE.indexOf(section);
-  S.view = editing ? "edit" : null;
-  S.answers = editing ? { ...(S.profile.sections[section.key]?.answers || {}) } : {};
-  if (!editing) setProgress(5 + (idx / QUESTIONNAIRE.length) * 45);
+  S.view = mode === "edit" ? "edit" : null;
+  S.drafts = S.drafts || {};
+  S.answers = editing ? { ...(S.profile.sections[section.key]?.answers || {}) } : { ...(S.drafts[section.key] || {}) };
+  if (mode !== "edit") setProgress(5 + (idx / QUESTIONNAIRE.length) * 45);
+  const left = mode === "edit"
+    ? `<button class="link" id="cancel">Cancel</button>`
+    : idx > 0 ? `<button class="btn" id="back">Back</button>` : `<span class="muted small">Your answers save when you press Next.</span>`;
   app().innerHTML = `<section class="card">
-    <p class="step">${editing ? "Editing your answers" : `Questionnaire · part ${idx + 1} of ${QUESTIONNAIRE.length}`}</p>
+    <p class="step">${mode === "edit" ? "Editing your answers" : `Questionnaire · part ${idx + 1} of ${QUESTIONNAIRE.length}`}</p>
     <h1>${section.title}</h1><p class="lead">${section.intro}</p>
     <form id="qf" novalidate>${section.items.map(fieldHTML).join("")}</form>
     <div id="msg"></div>
-    <div class="row-btns">${editing ? `<button class="link" id="cancel">Cancel</button>` : `<span class="muted small">Your answers save when you press Next.</span>`}<button class="btn primary" id="next">${editing ? "Save changes" : "Next"}</button></div></section>`;
+    <div class="row-btns">${left}<button class="btn primary" id="next">${mode === "edit" ? "Save changes" : "Next"}</button></div></section>`;
+  if ($("back")) $("back").onclick = () => {
+    // Keep what they typed on this page, then show the previous part with its saved answers
+    if (mode === "new") S.drafts[section.key] = collect($("qf"));
+    screenSection(QUESTIONNAIRE[idx - 1], "back");
+    window.scrollTo(0, 0);
+  };
   const form = $("qf");
   form.querySelectorAll('[data-unit="height"]').forEach((sel) => sel.onchange = () => {
     form.querySelector(".h-cm").classList.toggle("hidden", sel.value !== "cm");
     form.querySelector(".h-ft").classList.toggle("hidden", sel.value === "cm");
   });
+  const syncShowIf = () => form.querySelectorAll("[data-showif]").forEach((box) => {
+    const picked = form.querySelector(`input[name="${box.dataset.showif}"]:checked`);
+    const on = !!picked && picked.value === box.dataset.showval;
+    box.classList.toggle("hidden", !on);
+    if (!on) box.querySelectorAll("input, select").forEach((i) => { if (i.type === "radio") i.checked = false; else if (i.tagName === "SELECT") i.selectedIndex = 0; else i.value = ""; });
+  });
+  form.addEventListener("change", syncShowIf);
   const ageBox = form.querySelector('[data-id="age"]');
   if (ageBox) { ageBox.min = CONFIG.MIN_AGE; ageBox.max = CONFIG.MAX_AGE; }
-  if (editing) $("cancel").onclick = screenMyAnswers;
+  if (mode === "edit") $("cancel").onclick = screenMyAnswers;
   let warned = false;
   $("next").onclick = async () => {
     const a = collect(form);
@@ -433,12 +471,13 @@ function screenSection(section, editing = false) {
     if (bad.length) { $("msg").innerHTML = errorBox(`Please fix the highlighted ${bad.length > 1 ? "answers" : "answer"} above.`); bad[0].scrollIntoView({ block: "center" }); return; }
     const missing = section.items.filter((it) => it.required && !a[it.id]);
     if (missing.length) { $("msg").innerHTML = errorBox(`Please answer: ${missing.map((it) => it.q).join(" ")}`); return; }
-    const needOther = section.items.find((it) => it.showIf && Object.entries(it.showIf).every(([k, v]) => a[k] === v) && !a[it.id]);
+    const visible = (it) => !it.showIf || Object.entries(it.showIf).every(([k, v]) => a[k] === v);
+    const needOther = section.items.find((it) => it.id === "ethnicity_other" && visible(it) && !a[it.id]);
     if (needOther) { $("msg").innerHTML = errorBox("You chose Other. Please describe it in the box."); return; }
-    const blanks = section.items.filter((it) => it.id && !it.required && it.type !== "text" && !["height", "weight"].includes(it.type) && (a[it.id] === "" || a[it.id] === undefined)).length;
+    const blanks = section.items.filter((it) => it.id && visible(it) && !it.required && it.type !== "text" && !["height", "weight"].includes(it.type) && (a[it.id] === "" || a[it.id] === undefined)).length;
     if (blanks && !warned) {
       warned = true;
-      $("msg").innerHTML = errorBox(`You left ${blanks} question${blanks > 1 ? "s" : ""} blank. That's okay if you'd rather skip ${blanks > 1 ? "them" : "it"}. Press ${editing ? "Save changes" : "Next"} again to continue, or go back and answer.`);
+      $("msg").innerHTML = errorBox(`You left ${blanks} question${blanks > 1 ? "s" : ""} blank. That's okay if you'd rather skip ${blanks > 1 ? "them" : "it"}. Press ${mode === "edit" ? "Save changes" : "Next"} again to continue, or go back and answer.`);
       return;
     }
     let extra = {};
@@ -455,8 +494,8 @@ function screenSection(section, editing = false) {
       $("msg").innerHTML = errorBox(r.error === "locked" ? "Answers can no longer be changed once week 1 is finished." : "We couldn't save your answers. Check your internet and try again.");
       return;
     }
-    if (editing) screenMyAnswers("Your changes are saved.");
-    else route();
+    if (mode === "edit") screenMyAnswers("Your changes are saved.");
+    else { delete S.drafts[section.key]; route(); }
   };
 }
 
@@ -471,6 +510,7 @@ function answerText(it, ans) {
   const v = ans[it.id];
   if (v === undefined || v === "") return "";
   if (it.type === "time") return timeLabel(v);
+  if (it.type === "duration") return `${Math.floor(Number(v) / 60)} h ${Number(v) % 60} min`;
   if (it.type === "radio" || it.type === "select") return ans[it.id + "_answer"] || (it.options.find((o) => String(o.value) === String(v)) || {}).label || v;
   return it.unit ? `${v} ${it.unit}` : String(v);
 }
@@ -561,7 +601,8 @@ function screenWeeklySleep(week) {
         <label class="radio"><input type="radio" name="n" data-id="week_normal" value="Yes" data-label="Yes"/><span>Yes</span></label>
         <label class="radio"><input type="radio" name="n" data-id="week_normal" value="No" data-label="No"/><span>No</span></label></div></div>
     </form><div id="msg"></div>
-    <div class="row-btns"><span></span><button class="btn primary" id="next">Continue to tests</button></div></section>`;
+    <div class="row-btns">${week === 1 && editable() ? `<button class="btn" id="back">Back</button>` : "<span></span>"}<button class="btn primary" id="next">Continue to tests</button></div></section>`;
+  if ($("back")) $("back").onclick = () => { screenSection(QUESTIONNAIRE[QUESTIONNAIRE.length - 1], "back"); renderChrome(); window.scrollTo(0, 0); };
   $("next").onclick = async () => {
     const a = collect($("sf"));
     delete a.week_normal_answer;

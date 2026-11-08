@@ -55,16 +55,27 @@ const QUESTIONNAIRE = [
       { id: "habitual_wake", q: "On a typical morning, what time do you usually wake up?", type: "time" },
       { id: "preferred_sleep", q: "If you were completely free to plan your day, what time would you go to sleep?", type: "time" },
       { id: "preferred_wake", q: "If you were completely free to plan your day, what time would you wake up?", type: "time" },
-      { id: "mctq_workdays", q: "How many days a week do you have a regular work schedule (including school or caregiving schedules)?", type: "number", min: 0, max: 7, unit: "days" },
-      { heading: "On workdays" },
-      { id: "mctq_w_bed", q: "On workdays, what time do you go to bed?", type: "time" },
-      { id: "mctq_w_latency", q: "On workdays, how many minutes does it usually take you to fall asleep?", type: "number", min: 0, max: 300, unit: "minutes" },
-      { id: "mctq_w_wake", q: "On workdays, what time do you wake up?", type: "time" },
-      { heading: "On free days (days with no work schedule)" },
-      { id: "mctq_f_bed", q: "On free days, what time do you go to bed?", type: "time" },
-      { id: "mctq_f_latency", q: "On free days, how many minutes does it usually take you to fall asleep?", type: "number", min: 0, max: 300, unit: "minutes" },
-      { id: "mctq_f_wake", q: "On free days, what time do you wake up?", type: "time" },
-      { id: "mctq_f_alarm", q: "Do you use an alarm clock on free days?", type: "radio", options: opts(["Yes", "No"]) },
+      { id: "mctq_work", q: "I have a regular work schedule (this includes being, for example, a housewife or househusband):", type: "radio", options: opts(["Yes", "No"]) },
+      { id: "mctq_wd", q: "I have a regular work schedule and work ___ days per week", type: "number", min: 1, max: 7, unit: "days per week", showIf: { mctq_work: "Yes" } },
+      { heading: "Workdays", showIf: { mctq_work: "Yes" } },
+      { id: "mctq_w_bed", q: "I go to bed at ___ o'clock", type: "time", showIf: { mctq_work: "Yes" } },
+      { id: "mctq_w_sprep", q: "I actually get ready to fall asleep at ___ o'clock", type: "time", showIf: { mctq_work: "Yes" } },
+      { id: "mctq_w_latency", q: "I need ___ minutes to fall asleep", type: "number", min: 0, max: 300, unit: "minutes", showIf: { mctq_work: "Yes" } },
+      { id: "mctq_w_wake", q: "I wake up at ___ o'clock", type: "time", showIf: { mctq_work: "Yes" } },
+      { id: "mctq_w_getup", q: "After ___ minutes, I get up", type: "number", min: 0, max: 300, unit: "minutes", showIf: { mctq_work: "Yes" } },
+      { id: "mctq_w_alarm", q: "I use an alarm clock on workdays:", type: "radio", options: opts(["Yes", "No"]), showIf: { mctq_work: "Yes" } },
+      { id: "mctq_w_wake_before", q: "If \"Yes\": I regularly wake up BEFORE the alarm rings:", type: "radio", options: opts(["Yes", "No"]), showIf: { mctq_w_alarm: "Yes" } },
+      { id: "mctq_w_light", q: "On average, I spend the following amount of time outdoors in daylight (without a roof above my head):", type: "duration", showIf: { mctq_work: "Yes" } },
+      { heading: "Free days" },
+      { id: "mctq_f_bed", q: "I go to bed at ___ o'clock", type: "time" },
+      { id: "mctq_f_sprep", q: "I actually get ready to fall asleep at ___ o'clock", type: "time" },
+      { id: "mctq_f_latency", q: "I need ___ minutes to fall asleep", type: "number", min: 0, max: 300, unit: "minutes" },
+      { id: "mctq_f_wake", q: "I wake up at ___ o'clock", type: "time" },
+      { id: "mctq_f_getup", q: "After ___ minutes, I get up", type: "number", min: 0, max: 300, unit: "minutes" },
+      { id: "mctq_f_alarm", q: "My wake-up time is due to the use of an alarm clock:", type: "radio", options: opts(["Yes", "No"]) },
+      { id: "mctq_f_reasons", q: "There are particular reasons why I <b>cannot</b> freely choose my sleep times on free days:", type: "radio", options: opts(["Yes", "No"]) },
+      { id: "mctq_f_reasons_why", q: "If \"Yes\": Child(ren)/pet(s), Hobbies, Others, for example:", type: "text", showIf: { mctq_f_reasons: "Yes" } },
+      { id: "mctq_f_light", q: "On average, I spend the following amount of time outdoors in daylight (without a roof above my head):", type: "duration" },
     ],
   },
   {
@@ -204,22 +215,26 @@ function scorePSQI(a) {
 // MCTQ: sleep-corrected mid-sleep on free days (MSFsc), as a clock time "HH:MM".
 // Blank when it can't be computed (alarm on free days, no free days, or missing answers).
 function computeMSFsc(a) {
+  // Standard MCTQ: SO = time ready to fall asleep + sleep latency; SD = SE - SO; MSF = SO_f + SD_f / 2;
+  // if SD_f > SD_w: MSFsc = MSF - (SD_f - SD_week) / 2, SD_week = (SD_w * WD + SD_f * FD) / 7.
+  // Not computed when the free-day wake-up is due to an alarm clock.
   const t = (k) => toMinutes(a[k]);
   const num = (k) => (a[k] === "" || a[k] === undefined ? null : Number(a[k]));
-  const wd = num("mctq_workdays");
-  const need = [t("mctq_f_bed"), t("mctq_f_wake"), num("mctq_f_latency"), wd];
-  if (need.some((v) => v === null) || a.mctq_f_alarm === "Yes" || wd >= 7) return { msfsc: "" };
   const mod = (x) => ((x % 1440) + 1440) % 1440;
-  const soF = mod(t("mctq_f_bed") + num("mctq_f_latency"));
+  const fmt = (m) => { m = Math.round(mod(m)); return `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; };
+  if (a.mctq_f_alarm === "Yes" || a.mctq_f_alarm === "" || a.mctq_work === "" || a.mctq_work === undefined) return { msfsc: "" };
+  const wd = a.mctq_work === "Yes" ? num("mctq_wd") : 0;
+  if (wd === null || wd >= 7) return { msfsc: "" };
+  if ([t("mctq_f_sprep"), t("mctq_f_wake"), num("mctq_f_latency")].some((v) => v === null)) return { msfsc: "" };
+  const soF = mod(t("mctq_f_sprep") + num("mctq_f_latency"));
   const sdF = mod(t("mctq_f_wake") - soF);
   let msf = soF + sdF / 2;
   if (wd > 0) {
-    if ([t("mctq_w_bed"), t("mctq_w_wake"), num("mctq_w_latency")].some((v) => v === null)) return { msfsc: "" };
-    const soW = mod(t("mctq_w_bed") + num("mctq_w_latency"));
+    if ([t("mctq_w_sprep"), t("mctq_w_wake"), num("mctq_w_latency")].some((v) => v === null)) return { msfsc: "" };
+    const soW = mod(t("mctq_w_sprep") + num("mctq_w_latency"));
     const sdW = mod(t("mctq_w_wake") - soW);
     const sdWeek = (sdW * wd + sdF * (7 - wd)) / 7;
     if (sdF > sdW) msf -= (sdF - sdWeek) / 2;
   }
-  const m = Math.round(mod(msf));
-  return { msfsc: `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}` };
+  return { msfsc: fmt(msf) };
 }
