@@ -21,7 +21,7 @@ function consentHTML() {
   <p><b>Your results.</b> After each task you will see your score on it, such as how many word pairs you remembered. These are task scores, not a health measure. You will not receive any Alzheimer's-related score, and nothing in this study is a diagnosis.</p>
   <p><b>Benefits.</b> There is no direct benefit to you. The study helps test whether sleep timing carries early information about Alzheimer's risk.</p>
   <p><b>Taking part is voluntary.</b> You can skip any question and stop at any time, for any reason, without any penalty.</p>
-  <p><b>Questions?</b> Email the study team at ${c.CONTACT_EMAIL}, or contact the Adult Sponsor, ${c.SPONSOR_NAME} (${c.SPONSOR_EMAIL}).</p>`;
+  <p><b>Questions?</b> Email the study team at ${c.CONTACT_EMAIL}.</p>`;
 }
 
 // ---- Option helpers ----
@@ -37,8 +37,9 @@ const QUESTIONNAIRE = [
     items: [
       { id: "age", q: "How old are you?", type: "number", min: 18, max: 110, unit: "years" },
       { id: "sex", q: "What is your sex?", type: "radio", options: opts(["Female", "Male", "Prefer not to say"]) },
-      { id: "ethnicity", q: "Which best describes your ethnicity?", type: "select",
-        options: opts(["Asian", "Black or African", "Hispanic or Latino", "Middle Eastern or North African", "Native American or Alaska Native", "Native Hawaiian or Pacific Islander", "White", "Mixed or multiple", "Other", "Prefer not to say"]) },
+      { id: "ethnicity", q: "What is your ethnicity?", type: "radio", required: true,
+        options: opts(["Caucasian", "South Asian", "East Asian", "Hispanic", "African American", "Native American", "Other"]) },
+      { id: "ethnicity_other", q: "If other, please describe", type: "text", showIf: { ethnicity: "Other" } },
       { id: "height", q: "What is your height?", type: "height" },
       { id: "weight", q: "What is your weight?", type: "weight" },
       { id: "family_history", q: "Has a parent, brother or sister of yours been diagnosed with Alzheimer's disease?", type: "radio", options: opts(["Yes", "No", "Not sure"]) },
@@ -144,7 +145,7 @@ function scoreMEQ(a) {
     if (v === undefined || v === "") return { meq_total: "", meq_category: "" };
     total += Number(v);
   }
-  let cat = "Neither type";
+  let cat = "Intermediate";
   if (total >= 70) cat = "Definite morning";
   else if (total >= 59) cat = "Moderate morning";
   else if (total <= 30) cat = "Definite evening";

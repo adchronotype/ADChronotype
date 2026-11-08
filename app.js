@@ -420,7 +420,11 @@ function screenSection(section, editing = false) {
     });
     form.querySelectorAll(".invalid").forEach((e) => e.classList.remove("invalid"));
     if (bad.length) { bad.forEach((e) => e.classList.add("invalid")); $("msg").innerHTML = errorBox("Some numbers are outside the expected range. Please check the highlighted boxes."); bad[0].scrollIntoView({ block: "center" }); return; }
-    const blanks = section.items.filter((it) => it.id && it.type !== "text" && !["height", "weight"].includes(it.type) && (a[it.id] === "" || a[it.id] === undefined)).length;
+    const missing = section.items.filter((it) => it.required && !a[it.id]);
+    if (missing.length) { $("msg").innerHTML = errorBox(`Please answer: ${missing.map((it) => it.q).join(" ")}`); return; }
+    const needOther = section.items.find((it) => it.showIf && Object.entries(it.showIf).every(([k, v]) => a[k] === v) && !a[it.id]);
+    if (needOther) { $("msg").innerHTML = errorBox("You chose Other. Please describe it in the box."); return; }
+    const blanks = section.items.filter((it) => it.id && !it.required && it.type !== "text" && !["height", "weight"].includes(it.type) && (a[it.id] === "" || a[it.id] === undefined)).length;
     if (blanks && !warned) {
       warned = true;
       $("msg").innerHTML = errorBox(`You left ${blanks} question${blanks > 1 ? "s" : ""} blank. That's okay if you'd rather skip ${blanks > 1 ? "them" : "it"}. Press ${editing ? "Save changes" : "Next"} again to continue, or go back and answer.`);

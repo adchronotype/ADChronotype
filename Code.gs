@@ -17,13 +17,13 @@ const TZ = "America/Los_Angeles";
 const EMAIL_SUBJECT = "Your ADChronotype Study login code";
 
 const IDENTITY = ["returning", "old_id", "email", "code", "reg_no", "registered_at", "consent_at"];
-const ABOUT = ["age", "sex", "ethnicity", "height_cm", "height_unit_entered", "weight_kg", "weight_unit_entered", "family_history", "education_years", "depression_history", "about_at"];
+const ABOUT = ["age", "sex", "ethnicity", "ethnicity_other", "height_cm", "height_unit_entered", "weight_kg", "weight_unit_entered", "family_history", "education_years", "depression_history", "about_at"];
 const SLEEP = ["habitual_sleep", "habitual_wake", "preferred_sleep", "preferred_wake", "sleep_at"];
 const SUMMARY = ["MEQ", "PSQI", "MCTQ (MSFsc)"];
 const HISTORY = ["shift_years", "wake_20s", "wake_30s", "wake_40s", "wake_50s", "wake_60s", "years_before_7", "wake_change_12mo", "wake_change_detail", "history_at", "meq_at", "psqi_at"];
 const WEEK = w => ["sleep_time", "wake_time", "normal", "sleep_at", "memory", "stroop_cong", "stroop_incong", "digit_span", "rt_ms", "completed_at"].map(k => `w${w}_${k}`);
 const RESPONSES_COLS = [].concat(IDENTITY, ABOUT, SLEEP, SUMMARY, HISTORY, WEEK(1), WEEK(2), WEEK(3));
-const DETAIL_LEAD = { MEQ: ["reg_no", "meq_total", "meq_category"], PSQI: ["reg_no", "psqi_global", "psqi_c1", "psqi_c2", "psqi_c3", "psqi_c4", "psqi_c5", "psqi_c6", "psqi_c7", "psqi_efficiency_pct"], MCTQ: ["reg_no", "msfsc"] };
+const DETAIL_LEAD = { MEQ: ["reg_no", "meq_result"], PSQI: ["reg_no", "psqi_global", "psqi_c1", "psqi_c2", "psqi_c3", "psqi_c4", "psqi_c5", "psqi_c6", "psqi_c7", "psqi_efficiency_pct"], MCTQ: ["reg_no", "msfsc"] };
 const TEST_KEYS = ["memory", "stroop", "digitspan", "rt"];
 
 // ---------------- entry points ----------------
@@ -233,7 +233,7 @@ function saveData(p) {
       writeFields(sh, r, resp, RESPONSES_COLS);
     } else if (s === "meq" || s === "psqi") {
       const tab = s.toUpperCase();
-      const dr = upsertDetail(tab, reg, a);
+      const dr = upsertDetail(tab, reg, combine(a));
       const o = {};
       if (s === "meq") o.MEQ = link("MEQ", dr, a.meq_total !== "" && a.meq_total !== undefined ? `${a.meq_category} (${a.meq_total})` : "view");
       else o.PSQI = link("PSQI", dr, a.psqi_global !== "" && a.psqi_global !== undefined ? String(a.psqi_global) : "view");
@@ -262,6 +262,26 @@ function saveData(p) {
   return { ok: true, profile: profile(r) };
 }
 
+// For the MEQ and PSQI tabs: one readable cell per question, "answer (points)"
+function combine(a) {
+  const o = {};
+  Object.keys(a).forEach(k => {
+    if (/_answer$/.test(k) || k === "meq_category" || k === "meq_total") return;
+    o[k] = a[k + "_answer"] !== undefined && a[k] !== "" ? `${a[k + "_answer"]} (${a[k]})` : a[k];
+  });
+  if ("meq_total" in a) o.meq_result = a.meq_total === "" ? "" : `${a.meq_category} (${a.meq_total})`;
+  return o;
+}
+// The reverse, so the site can show and edit the answers
+function split(row) {
+  const o = {};
+  Object.keys(row).forEach(k => {
+    const m = /^(meq\d+|psqi\d+[a-j]?)$/.test(k) && String(row[k]).match(/^(.*) \((\d+)\)$/);
+    if (m) { o[k] = Number(m[2]); o[k + "_answer"] = m[1]; } else o[k] = row[k];
+  });
+  if (row.meq_result) { const m = String(row.meq_result).match(/^(.*) \((\d+)\)$/); if (m) { o.meq_category = m[1]; o.meq_total = Number(m[2]); } }
+  return o;
+}
 function upsertDetail(tab, reg, data) {
   const sh = sheet(tab);
   headers(sh, DETAIL_LEAD[tab]);
@@ -295,7 +315,7 @@ function profile(r) {
   const p = readRow(sheet("Responses"), r);
   const reg = p.reg_no;
   const pick = (keys) => { const o = {}; keys.forEach(k => { if (!/_at$/.test(k) && p[k] !== "" && p[k] !== undefined) o[k] = p[k]; }); return o; };
-  const detail = (tab) => { const sh = sheet(tab); const row = findRow(sh, "reg_no", reg); return row > 0 ? readRow(sh, row) : {}; };
+  const detail = (tab) => { const sh = sheet(tab); const row = findRow(sh, "reg_no", reg); return row > 0 ? split(readRow(sh, row)) : {}; };
   const sections = {};
   if (p.about_at) sections.about = { saved_at: p.about_at, answers: pick(ABOUT) };
   if (p.sleep_at) sections.sleep = { saved_at: p.sleep_at, answers: Object.assign(pick(SLEEP), detail("MCTQ")) };
