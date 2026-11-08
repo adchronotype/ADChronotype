@@ -185,14 +185,21 @@ function forgot(email) {
 function sendCode(email, code) {
   MailApp.sendEmail({
     to: email,
+    name: "ADChronotype Study",
     subject: EMAIL_SUBJECT,
     body:
-      "Thank you for taking part in the ADChronotype Study.\n\n" +
-      "Your login code is: " + code + "\n\n" +
+      "Thank you for taking part in the ADChronotype Study.\n\nYour login code is: " + code + "\n\n" +
       "Use it to log in on the study page any time: to continue on another device, to view or edit your answers, " +
       "and to come back for weeks 2 and 3 (each opens about a week after you finish the previous one).\n\n" +
-      "The tests need a computer with a keyboard.\n\n" +
-      "Questions? Just reply to this email.",
+      "The tests must be done on a computer with a keyboard (not a phone or tablet).\n\nQuestions? Just reply to this email.",
+    htmlBody:
+      '<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#1c2333">' +
+      "<p>Thank you for taking part in the ADChronotype Study.</p>" +
+      '<p>Your login code is:</p><p style="font-size:28px;font-weight:bold;letter-spacing:4px;margin:4px 0 16px">' + code + "</p>" +
+      "<p>Use it to log in on the study page any time: to continue on another device, to view or edit your answers, " +
+      "and to come back for <b>weeks 2 and 3</b> (each opens about a week after you finish the previous one).</p>" +
+      "<p><b>The tests must be done on a computer with a keyboard</b> (not a phone or tablet).</p>" +
+      "<p>Questions? Just reply to this email.</p></div>",
   });
 }
 

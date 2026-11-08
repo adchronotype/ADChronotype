@@ -160,3 +160,5 @@ body:not(.has-side) #hdr-answers { display: inline-block; }
   .topbar { padding: 10px 14px; }
   .brand { font-size: 15px; }
 }
+.field-err { color: var(--danger); font-size: 15px; font-weight: 600; margin-top: 6px; }
+.field-err:empty { display: none; }

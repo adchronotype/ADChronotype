@@ -349,7 +349,7 @@ function fieldHTML(it) {
   const label = `<div class="q">${it.q}</div>`;
   switch (it.type) {
     case "number":
-      return `<div class="item">${label}<div class="inline"><input type="number" data-id="${it.id}" min="${it.min ?? ""}" max="${it.max ?? ""}" step="${it.step ?? 1}" inputmode="decimal" value="${esc(v)}" />${it.unit ? `<span class="unit">${it.unit}</span>` : ""}</div></div>`;
+      return `<div class="item">${label}<div class="inline"><input type="number" data-id="${it.id}" min="${it.min ?? ""}" max="${it.max ?? ""}" step="${it.step ?? 1}" inputmode="decimal" value="${esc(v)}" />${it.unit ? `<span class="unit">${it.unit}</span>` : ""}</div><div class="field-err"></div></div>`;
     case "time":
       return `<div class="item">${label}${timeSelect(it.id, v)}</div>`;
     case "text":
@@ -408,18 +408,29 @@ function screenSection(section, editing = false) {
     form.querySelector(".h-cm").classList.toggle("hidden", sel.value !== "cm");
     form.querySelector(".h-ft").classList.toggle("hidden", sel.value === "cm");
   });
+  const ageBox = form.querySelector('[data-id="age"]');
+  if (ageBox) { ageBox.min = CONFIG.MIN_AGE; ageBox.max = CONFIG.MAX_AGE; }
   if (editing) $("cancel").onclick = screenMyAnswers;
   let warned = false;
   $("next").onclick = async () => {
     const a = collect(form);
+    $("msg").innerHTML = "";
+    form.querySelectorAll(".invalid").forEach((e) => e.classList.remove("invalid"));
+    form.querySelectorAll(".field-err").forEach((e) => (e.textContent = ""));
     const bad = [];
     form.querySelectorAll('input[type="number"]').forEach((el) => {
       if (el.value === "") return;
       const x = Number(el.value);
-      if ((el.min !== "" && x < Number(el.min)) || (el.max !== "" && x > Number(el.max))) bad.push(el);
+      if (isNaN(x) || (el.min !== "" && x < Number(el.min)) || (el.max !== "" && x > Number(el.max))) {
+        bad.push(el);
+        el.classList.add("invalid");
+        const box = el.closest(".item")?.querySelector(".field-err");
+        if (box) box.textContent = el.dataset.id === "age"
+          ? `This study is for adults aged ${CONFIG.MIN_AGE} to ${CONFIG.MAX_AGE}. Please check your age.`
+          : `Please enter a number from ${el.min} to ${el.max}.`;
+      }
     });
-    form.querySelectorAll(".invalid").forEach((e) => e.classList.remove("invalid"));
-    if (bad.length) { bad.forEach((e) => e.classList.add("invalid")); $("msg").innerHTML = errorBox("Some numbers are outside the expected range. Please check the highlighted boxes."); bad[0].scrollIntoView({ block: "center" }); return; }
+    if (bad.length) { $("msg").innerHTML = errorBox(`Please fix the highlighted ${bad.length > 1 ? "answers" : "answer"} above.`); bad[0].scrollIntoView({ block: "center" }); return; }
     const missing = section.items.filter((it) => it.required && !a[it.id]);
     if (missing.length) { $("msg").innerHTML = errorBox(`Please answer: ${missing.map((it) => it.q).join(" ")}`); return; }
     const needOther = section.items.find((it) => it.showIf && Object.entries(it.showIf).every(([k, v]) => a[k] === v) && !a[it.id]);
@@ -429,9 +440,6 @@ function screenSection(section, editing = false) {
       warned = true;
       $("msg").innerHTML = errorBox(`You left ${blanks} question${blanks > 1 ? "s" : ""} blank. That's okay if you'd rather skip ${blanks > 1 ? "them" : "it"}. Press ${editing ? "Save changes" : "Next"} again to continue, or go back and answer.`);
       return;
-    }
-    if (section.key === "about" && a.age !== "" && (Number(a.age) < CONFIG.MIN_AGE || Number(a.age) > CONFIG.MAX_AGE)) {
-      if (!confirm(`You entered an age of ${a.age}. This study is for adults aged ${CONFIG.MIN_AGE} to ${CONFIG.MAX_AGE}. Is your age correct?`)) return;
     }
     let extra = {};
     if (section.key === "meq") extra = scoreMEQ(a);
