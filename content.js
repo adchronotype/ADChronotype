@@ -36,7 +36,7 @@ const WAKE_RANGES = opts(WAKE_RANGES_LABELS);
 const QUESTIONNAIRE = [
   {
     key: "about", title: "About you",
-    intro: "A few questions about you. You can skip any question.",
+    intro: "A few questions about you.",
     items: [
       { id: "age", q: "How old are you?", type: "number", min: 18, max: 110, unit: "years" },
       { id: "sex", q: "What is your sex?", type: "radio", options: opts(["Female", "Male", "Prefer not to say"]) },
