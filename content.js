@@ -26,7 +26,10 @@ function consentHTML() {
 
 // ---- Option helpers ----
 const FREQ = ["Not during the past month", "Less than once a week", "Once or twice a week", "Three or more times a week"];
+const WAKE_RANGES_LABELS = ["Before 6 AM", "6 to 7 AM", "7 to 8 AM", "8 to 9 AM", "After 9 AM", "No fixed time"];
 const opts = (labels, scores) => labels.map((l, i) => ({ label: l, value: scores ? scores[i] : l }));
+
+const WAKE_RANGES = opts(WAKE_RANGES_LABELS);
 
 // ---- Questionnaire sections ----
 // type: number | select | radio | time | text | height | weight | yesno
@@ -135,12 +138,12 @@ const QUESTIONNAIRE = [
     intro: "Last section. These questions are about the schedules you have had to keep over your adult life.",
     items: [
       { id: "shift_years", q: "In total, how many years have you worked night shifts or rotating shifts? (Enter 0 if never.)", type: "number", min: 0, max: 60, unit: "years" },
-      { heading: "In each decade of your adult life, what time did you usually have to wake up on weekdays?" },
-      { id: "wake_20s", q: "In your 20s", type: "time", decade: 20 },
-      { id: "wake_30s", q: "In your 30s", type: "time", decade: 30 },
-      { id: "wake_40s", q: "In your 40s", type: "time", decade: 40 },
-      { id: "wake_50s", q: "In your 50s", type: "time", decade: 50 },
-      { id: "wake_60s", q: "In your 60s", type: "time", decade: 60 },
+      { heading: "In each decade of your adult life, what time did you have to be up on most weekdays?" },
+      { id: "wake_20s", q: "In your 20s", type: "radio", options: WAKE_RANGES, decade: 20 },
+      { id: "wake_30s", q: "In your 30s", type: "radio", options: WAKE_RANGES, decade: 30 },
+      { id: "wake_40s", q: "In your 40s", type: "radio", options: WAKE_RANGES, decade: 40 },
+      { id: "wake_50s", q: "In your 50s", type: "radio", options: WAKE_RANGES, decade: 50 },
+      { id: "wake_60s", q: "In your 60s", type: "radio", options: WAKE_RANGES, decade: 60 },
       { id: "years_before_7", q: "In total, about how many years of your adult life have you had to be up before 7:00 AM on weekdays?", type: "number", min: 0, max: 70, unit: "years" },
       { id: "wake_change_12mo", q: "In the past 12 months, has the time you have to wake up on weekdays changed (for example a new job, retirement, or working from home)?", type: "radio", options: opts(["Yes", "No"]) },
       { id: "wake_change_detail", q: "If yes, what changed, and roughly when?", type: "text", showIf: { wake_change_12mo: "Yes" } },
