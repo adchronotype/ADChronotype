@@ -377,6 +377,9 @@ function screenForgot(msg) {
 // ---------- Questionnaire ----------
 // Any item (or heading) with showIf only appears when the earlier answer matches
 function fieldHTML(it) {
+  // Decade questions only appear for decades the person has reached (from their age in part 1)
+  const age = Number(S.profile?.sections.about?.answers.age || 0);
+  if (it.decade && age && age < it.decade) return "";
   const html = fieldInner(it);
   if (!it.showIf) return html;
   const [k, val] = Object.entries(it.showIf)[0];
@@ -481,7 +484,6 @@ function screenSection(section, mode = "new") {
   const ageBox = form.querySelector('[data-id="age"]');
   if (ageBox) { ageBox.min = CONFIG.MIN_AGE; ageBox.max = CONFIG.MAX_AGE; }
   if (mode === "edit") $("cancel").onclick = () => (S.editReturn === "answers" ? screenMyAnswers() : route());
-  let warned = false;
   $("next").onclick = async () => {
     const a = collect(form);
     $("msg").innerHTML = "";
@@ -507,15 +509,27 @@ function screenSection(section, mode = "new") {
       }
     });
     if (bad.length) { $("msg").innerHTML = errorBox(`Please fix the highlighted ${bad.length > 1 ? "answers" : "answer"} above.`); bad[0].scrollIntoView({ block: "center" }); return; }
-    const missing = section.items.filter((it) => it.required && !a[it.id]);
-    if (missing.length) { $("msg").innerHTML = errorBox(`Please answer: ${missing.map((it) => it.q).join(" ")}`); return; }
+    // Every question that is showing must be answered (only items marked optional can be left blank)
     const visible = (it) => !it.showIf || Object.entries(it.showIf).every(([k, v]) => a[k] === v);
-    const needOther = section.items.find((it) => it.id === "ethnicity_other" && visible(it) && !a[it.id]);
-    if (needOther) { $("msg").innerHTML = errorBox("You chose Other. Please describe it in the box."); return; }
-    const blanks = section.items.filter((it) => it.id && visible(it) && !it.required && it.type !== "text" && !["height", "weight"].includes(it.type) && (a[it.id] === "" || a[it.id] === undefined)).length;
-    if (blanks && !warned) {
-      warned = true;
-      $("msg").innerHTML = errorBox(`You left ${blanks} question${blanks > 1 ? "s" : ""} blank. That's okay if you'd rather skip ${blanks > 1 ? "them" : "it"}. Press ${mode === "edit" ? "Save changes" : "Next"} again to continue, or go back and answer.`);
+    const age = Number((section.key === "about" ? a : S.profile.sections.about?.answers || {}).age || 0);
+    const DECADES = { wake_20s: 20, wake_30s: 30, wake_40s: 40, wake_50s: 50, wake_60s: 60 };
+    const needed = (it) => {
+      if (!it.id || !visible(it) || it.optional) return false;
+      if (it.id in DECADES) return !age || age >= DECADES[it.id];     // only decades they have reached
+      if (it.id === "psqi5j") return !!a.psqi5j_text;                  // only if they named another reason
+      return true;
+    };
+    const keyOf = (it) => (it.type === "height" ? "height_cm" : it.type === "weight" ? "weight_kg" : it.id);
+    form.querySelectorAll(".item.missing").forEach((el) => el.classList.remove("missing"));
+    const missing = section.items.filter((it) => needed(it) && (a[keyOf(it)] === "" || a[keyOf(it)] === undefined));
+    if (missing.length) {
+      const boxes = missing.map((it) => {
+        const sel = it.type === "height" ? '[data-id="height_cm"], [data-id="height_ft"]' : it.type === "weight" ? '[data-id="weight_value"]' : it.type === "duration" ? `[data-dur="${it.id}"]` : `[data-id="${it.id}"]`;
+        return form.querySelector(sel)?.closest(".item");
+      }).filter(Boolean);
+      boxes.forEach((b) => b.classList.add("missing"));
+      $("msg").innerHTML = errorBox(`Please answer every question. ${missing.length === 1 ? "1 question is" : missing.length + " questions are"} still blank (marked in red).`);
+      if (boxes[0]) boxes[0].scrollIntoView({ block: "center" });
       return;
     }
     let extra = {};
@@ -553,7 +567,8 @@ function answerText(it, ans) {
   return it.unit ? `${v} ${it.unit}` : String(v);
 }
 function qaList(items, ans) {
-  return `<dl class="qa">${items.filter((it) => (it.id || it.type) && (!it.showIf || Object.entries(it.showIf).every(([k, v]) => String(ans[k] ?? "") === v))).map((it) => {
+  const age = Number(S.profile?.sections.about?.answers.age || 0);
+  return `<dl class="qa">${items.filter((it) => !(it.decade && age && age < it.decade)).filter((it) => (it.id || it.type) && (!it.showIf || Object.entries(it.showIf).every(([k, v]) => String(ans[k] ?? "") === v))).map((it) => {
     const t = answerText(it, ans);
     return `<div><dt>${it.q}</dt><dd>${t ? esc(t) : `<span class="muted">Skipped</span>`}</dd></div>`;
   }).join("")}</dl>`;

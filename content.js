@@ -20,7 +20,7 @@ function consentHTML() {
   <p><b>What we collect and how it is protected.</b> We do not collect your name, date of birth, address or any medical record. We ask for your email address only to send you your login code (and to resend it if you forget it). It is kept with your answers in the study's password-protected file, never shared, and deleted once data collection closes. Your answers are otherwise identified only by a study number. Data is kept on password-protected storage, and results are only ever reported for the group, never for an individual.</p>
   <p><b>Your results.</b> After each task you will see your score on it, such as how many word pairs you remembered. These are task scores, not a health measure. You will not receive any Alzheimer's-related score, and nothing in this study is a diagnosis.</p>
   <p><b>Benefits.</b> There is no direct benefit to you. The study helps test whether sleep timing carries early information about Alzheimer's risk.</p>
-  <p><b>Taking part is voluntary.</b> You can skip any question and stop at any time, for any reason, without any penalty.</p>
+  <p><b>Taking part is voluntary.</b> You can stop at any time, for any reason, without any penalty.</p>
   <p><b>Questions?</b> Email the study team at ${c.CONTACT_EMAIL}.</p>`;
 }
 
@@ -121,7 +121,7 @@ const QUESTIONNAIRE = [
       { id: "psqi5g", q: "Feel too hot", type: "radio", options: opts(FREQ, [0, 1, 2, 3]) },
       { id: "psqi5h", q: "Had bad dreams", type: "radio", options: opts(FREQ, [0, 1, 2, 3]) },
       { id: "psqi5i", q: "Have pain", type: "radio", options: opts(FREQ, [0, 1, 2, 3]) },
-      { id: "psqi5j_text", q: "Any other reason? Please describe (optional)", type: "text" },
+      { id: "psqi5j_text", q: "Any other reason? Please describe (optional)", type: "text", optional: true },
       { id: "psqi5j", q: "How often have you had trouble sleeping because of this other reason?", type: "radio", options: opts(FREQ, [0, 1, 2, 3]) },
       { heading: "During the past month..." },
       { id: "psqi6", q: "How would you rate your sleep quality overall?", type: "radio", options: opts(["Very good", "Fairly good", "Fairly bad", "Very bad"], [0, 1, 2, 3]) },
@@ -135,15 +135,15 @@ const QUESTIONNAIRE = [
     intro: "Last section. These questions are about the schedules you have had to keep over your adult life.",
     items: [
       { id: "shift_years", q: "In total, how many years have you worked night shifts or rotating shifts? (Enter 0 if never.)", type: "number", min: 0, max: 60, unit: "years" },
-      { heading: "In each decade of your adult life, what time did you usually have to wake up on weekdays?", note: "Leave blank any decade you have not reached yet." },
-      { id: "wake_20s", q: "In your 20s", type: "time" },
-      { id: "wake_30s", q: "In your 30s", type: "time" },
-      { id: "wake_40s", q: "In your 40s", type: "time" },
-      { id: "wake_50s", q: "In your 50s", type: "time" },
-      { id: "wake_60s", q: "In your 60s", type: "time" },
+      { heading: "In each decade of your adult life, what time did you usually have to wake up on weekdays?" },
+      { id: "wake_20s", q: "In your 20s", type: "time", decade: 20 },
+      { id: "wake_30s", q: "In your 30s", type: "time", decade: 30 },
+      { id: "wake_40s", q: "In your 40s", type: "time", decade: 40 },
+      { id: "wake_50s", q: "In your 50s", type: "time", decade: 50 },
+      { id: "wake_60s", q: "In your 60s", type: "time", decade: 60 },
       { id: "years_before_7", q: "In total, about how many years of your adult life have you had to be up before 7:00 AM on weekdays?", type: "number", min: 0, max: 70, unit: "years" },
       { id: "wake_change_12mo", q: "In the past 12 months, has the time you have to wake up on weekdays changed (for example a new job, retirement, or working from home)?", type: "radio", options: opts(["Yes", "No"]) },
-      { id: "wake_change_detail", q: "If yes, what changed, and roughly when? (optional)", type: "text" },
+      { id: "wake_change_detail", q: "If yes, what changed, and roughly when?", type: "text", showIf: { wake_change_12mo: "Yes" } },
     ],
   },
 ];

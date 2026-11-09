@@ -164,3 +164,4 @@ input.invalid { border-color: var(--danger); outline: 3px solid #fbe0dd; }
 .field-err:empty { display: none; }
 .saving { font-size: 13px; color: var(--muted); }
 .saving.warn { color: var(--danger); font-weight: 600; }
+.item.missing { background: #fdecea; border-radius: 10px; padding-left: 10px; padding-right: 10px; box-shadow: inset 3px 0 0 var(--danger); }
