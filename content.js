@@ -26,7 +26,7 @@ function consentHTML() {
 
 // ---- Option helpers ----
 const FREQ = ["Not during the past month", "Less than once a week", "Once or twice a week", "Three or more times a week"];
-const WAKE_RANGES_LABELS = ["Before 6 AM", "6 to 7 AM", "7 to 8 AM", "8 to 9 AM", "After 9 AM", "No fixed time"];
+const WAKE_RANGES_LABELS = ["Before 5 AM", "5 to 6 AM", "6 to 7 AM", "7 to 8 AM", "8 to 9 AM", "After 9 AM", "No fixed time"];
 const opts = (labels, scores) => labels.map((l, i) => ({ label: l, value: scores ? scores[i] : l }));
 
 const WAKE_RANGES = opts(WAKE_RANGES_LABELS);
