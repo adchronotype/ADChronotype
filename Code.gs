@@ -17,7 +17,7 @@ const TZ = "America/Los_Angeles";
 const EMAIL_SUBJECT = "Your ADChronotype Study login code";
 
 const IDENTITY = ["returning", "old_id", "email", "code", "reg_no", "registered_at", "consent_at"];
-const ABOUT = ["age", "sex", "ethnicity", "ethnicity_other", "height_cm", "height_unit_entered", "weight_kg", "weight_unit_entered", "family_history", "education_years", "depression_history", "about_at"];
+const ABOUT = ["age", "sex", "ethnicity", "ethnicity_other", "height_cm", "height_unit_entered", "weight_kg", "weight_unit_entered", "family_history", "education_years", "depression_history", "smoking", "alcohol_per_week", "active_days_per_week", "high_blood_pressure", "diabetes", "about_at"];
 const SLEEP = ["habitual_sleep", "habitual_wake", "preferred_sleep", "preferred_wake", "sleep_at"];
 const SUMMARY = ["MEQ", "PSQI", "MCTQ (MSFsc)"];
 const HISTORY = ["shift_years", "wake_20s", "wake_30s", "wake_40s", "wake_50s", "wake_60s", "years_before_7", "wake_change_12mo", "wake_change_detail", "history_at", "meq_at", "psqi_at"];

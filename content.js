@@ -16,7 +16,7 @@ function consentHTML() {
   return `
   <p><b>What this study is about.</b> This is a high school science research project on how sleep timing relates to thinking skills such as memory and attention in adults aged ${c.MIN_AGE} to ${c.MAX_AGE}.</p>
   <p><b>What you will do.</b> In week 1 you answer a questionnaire about your background and your sleep (about 15 to 20 minutes) and complete four short computer tasks on memory, attention and reaction time (about 10 to 15 minutes). In weeks 2 and 3 you answer two questions about your sleep and repeat the four tasks (about 10 to 15 minutes each time). The tasks need a computer with a keyboard; the questionnaire works on a phone.</p>
-  <p><b>Risks.</b> The risk is minimal. The tasks are hard on purpose, so it is normal to find them frustrating. One question asks whether you have ever been diagnosed with depression; you can answer "Prefer not to say."</p>
+  <p><b>Risks.</b> The risk is minimal. The tasks are hard on purpose, so it is normal to find them frustrating. Some questions ask about your health and habits: whether you have been diagnosed with depression, high blood pressure or diabetes, and whether you smoke or drink. Each of these has a "Prefer not to say" option.</p>
   <p><b>What we collect and how it is protected.</b> We do not collect your name, date of birth, address or any medical record. We ask for your email address only to send you your login code (and to resend it if you forget it). It is kept with your answers in the study's password-protected file, never shared, and deleted once data collection closes. Your answers are otherwise identified only by a study number. Data is kept on password-protected storage, and results are only ever reported for the group, never for an individual.</p>
   <p><b>Your results.</b> After each task you will see your score on it, such as how many word pairs you remembered. These are task scores, not a health measure. You will not receive any Alzheimer's-related score, and nothing in this study is a diagnosis.</p>
   <p><b>Benefits.</b> There is no direct benefit to you. The study helps test whether sleep timing carries early information about Alzheimer's risk.</p>
@@ -48,6 +48,11 @@ const QUESTIONNAIRE = [
       { id: "family_history", q: "Has a parent, brother or sister of yours been diagnosed with Alzheimer's disease?", type: "radio", options: opts(["Yes", "No", "Not sure"]) },
       { id: "education_years", q: "How many years of education have you completed in total? (For example, finishing high school is about 12, a four-year college degree about 16.)", type: "number", min: 0, max: 30, unit: "years" },
       { id: "depression_history", q: "Have you ever been diagnosed with depression?", type: "radio", options: opts(["Yes", "No", "Prefer not to say"]) },
+      { id: "smoking", q: "Do you smoke cigarettes?", type: "radio", options: opts(["Never smoked", "Used to smoke but quit", "Currently smoke", "Prefer not to say"]) },
+      { id: "alcohol_per_week", q: "In a typical week, how many standard alcoholic drinks do you have? (One drink is a 12 oz beer, a 5 oz glass of wine or a 1.5 oz shot of spirits.)", type: "radio", options: opts(["None", "1 to 7", "8 to 12", "13 to 20", "21 or more", "Prefer not to say"]) },
+      { id: "active_days_per_week", q: "In a typical week, on how many days do you do at least 30 minutes of moderate physical activity, such as brisk walking?", type: "radio", options: opts(["0 days", "1 day", "2 days", "3 days", "4 days", "5 days", "6 days", "7 days", "Prefer not to say"]) },
+      { id: "high_blood_pressure", q: "Has a doctor ever told you that you have high blood pressure (hypertension)?", type: "radio", options: opts(["Yes", "No", "Prefer not to say"]) },
+      { id: "diabetes", q: "Has a doctor ever told you that you have diabetes?", type: "radio", options: opts(["Yes", "No", "Prefer not to say"]) },
     ],
   },
   {
